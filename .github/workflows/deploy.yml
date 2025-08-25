@@ -1,0 +1,88 @@
+name: Deploy to VPS
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup SSH key
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+        
+    - name: Add server to known hosts
+      run: |
+        mkdir -p ~/.ssh
+        ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+        
+    - name: Deploy to VPS
+      run: |
+        ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
+          set -e
+          echo "🚀 Starting deployment..."
+          
+          # Navigate to project directory
+          cd /opt/rust-selfhost-server || {
+            echo "❌ Project directory not found. Please clone the repository first:"
+            echo "   git clone https://github.com/a-ariff/rust-selfhost-server.git /opt/rust-selfhost-server"
+            exit 1
+          }
+          
+          # Pull latest changes
+          echo "📦 Pulling latest changes..."
+          git fetch origin
+          git reset --hard origin/main
+          
+          # Update containers
+          echo "🐳 Updating Docker containers..."
+          docker compose pull
+          
+          # Restart services
+          echo "🔄 Restarting services..."
+          docker compose up -d
+          
+          # Wait for services to be healthy
+          echo "⏳ Waiting for services to start..."
+          sleep 10
+          
+          # Check service status
+          echo "✅ Checking service status..."
+          docker compose ps
+          
+          echo "🎉 Deployment completed successfully!"
+        EOF
+        
+    - name: Verify deployment
+      run: |
+        echo "🔍 Verifying deployment..."
+        # Basic connectivity test (optional)
+        # curl -f -s -o /dev/null https://${DOMAIN} && echo "✅ Service is responding" || echo "⚠️  Service health check failed"
+        echo "ℹ️  Deployment verification completed. Please check your domain manually."
+        
+    - name: Notify deployment status
+      if: always()
+      run: |
+        if [ "${{ job.status }}" == "success" ]; then
+          echo "✅ Deployment successful!"
+          echo "🌐 Your application should be available at your configured domain"
+          echo "📊 Check Traefik dashboard for routing status"
+        else
+          echo "❌ Deployment failed!"
+          echo "🔍 Check the logs above for error details"
+          echo "🔧 Common issues:"
+          echo "   - SSH connection problems"
+          echo "   - Missing environment variables (.env file)"
+          echo "   - Docker/Docker Compose not installed"
+          echo "   - Insufficient permissions"
+        fi
