@@ -1,0 +1,50 @@
+# Dynamic configuration
+http:
+  middlewares:
+    # Security headers middleware
+    security-headers:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - OPTIONS
+          - PUT
+        accessControlMaxAge: 100
+        hostsProxyHeaders:
+          - "X-Forwarded-Host"
+        referrerPolicy: "same-origin"
+        frameDeny: true
+        contentTypeNosniff: true
+        browserXssFilter: true
+        sslRedirect: true
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 31536000
+        forceSTSHeader: true
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
+
+    # Rate limiting middleware
+    rate-limit:
+      rateLimit:
+        average: 100
+        period: 1s
+        burst: 50
+
+    # Compression middleware
+    compression:
+      compress: {}
+
+  # TLS configuration
+  tls:
+    options:
+      default:
+        sslProtocols:
+          - "TLSv1.2"
+          - "TLSv1.3"
+        cipherSuites:
+          - "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384"
+          - "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305"
+          - "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"
+          - "TLS_RSA_WITH_AES_256_GCM_SHA384"
+          - "TLS_RSA_WITH_AES_128_GCM_SHA256"
+        minVersion: "VersionTLS12"
