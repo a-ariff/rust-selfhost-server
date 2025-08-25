@@ -1,0 +1,29 @@
+[package]
+name = "rust-selfhost-server"
+version = "0.1.0"
+edition = "2021"
+description = "A Rust Axum-based HTTP server with Docker Build Cloud CI/CD integration"
+authors = ["dockerariff"]
+license = "MIT"
+repository = "https://github.com/a-ariff/rust-selfhost-server"
+
+[[bin]]
+name = "rust-selfhost-server"
+path = "src/main.rs"
+
+[dependencies]
+axum = "0.7"
+tokio = { version = "1.0", features = ["full"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[profile.release]
+strip = true
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
