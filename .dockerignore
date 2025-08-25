@@ -1,0 +1,44 @@
+# Git files
+.git
+.gitignore
+
+# CI/CD files
+.github
+
+# Documentation
+README.md
+*.md
+
+# Target directory (build artifacts)
+target/
+
+# Dependency directories
+**/.cargo/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Logs
+*.log
+logs/
+
+# Testing
+*.orig
+
+# Docker files (don't need these in the build context)
+Dockerfile*
+.dockerignore
+docker-compose*.yml
