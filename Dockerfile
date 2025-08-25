@@ -5,13 +5,13 @@ FROM rust:1-bookworm AS builder
 # Create app directory
 WORKDIR /app
 
-# Copy manifests
-COPY Cargo.toml Cargo.lock ./
+# Copy manifests (Cargo.lock will be generated during build)
+COPY Cargo.toml ./
 
 # Create a dummy main.rs to build dependencies
 RUN mkdir src && echo "fn main() {}" > src/main.rs
 
-# Build dependencies (this will be cached if Cargo.toml/Cargo.lock don't change)
+# Build dependencies (this will generate Cargo.lock and cache dependencies)
 RUN cargo build --release
 
 # Remove the dummy main.rs
