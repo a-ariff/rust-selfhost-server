@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  traefik:
+    image: traefik:v2.10
+    container_name: traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Traefik dashboard (optional, remove in production)
+    environment:
+      - TRAEFIK_ACME_EMAIL=${TRAEFIK_ACME_EMAIL:-ariff.mit@gmail.com}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/traefik.yml:ro
+      - ./traefik/dynamic.yml:/dynamic.yml:ro
+      - traefik-ssl:/ssl
+    command:
+      - --configFile=/traefik.yml
+    networks:
+      - traefik-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.${DOMAIN}`)"
+      - "traefik.http.routers.traefik.tls=true"
+      - "traefik.http.routers.traefik.tls.certresolver=letsencrypt"
+      - "traefik.http.services.traefik.loadbalancer.server.port=8080"
+
+  rust-server:
+    build: .
+    container_name: rust-server
+    restart: unless-stopped
+    expose:
+      - "3000"
+    networks:
+      - traefik-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.rust-server.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.rust-server.tls=true"
+      - "traefik.http.routers.rust-server.tls.certresolver=letsencrypt"
+      - "traefik.http.services.rust-server.loadbalancer.server.port=3000"
+
+volumes:
+  traefik-ssl:
+
+networks:
+  traefik-network:
+    driver: bridge
