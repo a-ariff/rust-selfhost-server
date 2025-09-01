@@ -1,108 +1,106 @@
 use axum::{
-    extract::Json,
     http::StatusCode,
-    response::Json as ResponseJson,
+    response::{Html, IntoResponse, Json},
     routing::get,
     Router,
 };
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use tokio::net::TcpListener;
-use tower_http::trace::TraceLayer;
-use tracing::{info, info_span};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use serde::Serialize;
+use std::net::SocketAddr;
+use tokio::signal;
+use tower_http::cors::CorsLayer;
+use tracing::{info, warn};
+use tracing_subscriber;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 struct HealthResponse {
     status: String,
-    service: String,
-    version: String,
     timestamp: String,
 }
 
-#[derive(Serialize, Deserialize)]
-struct InfoResponse {
-    service: String,
-    version: String,
-    description: String,
-    endpoints: Vec<String>,
-}
-
-// Health check endpoint
-async fn healthz() -> Result<ResponseJson<HealthResponse>, StatusCode> {
-    let response = HealthResponse {
+async fn health_check() -> impl IntoResponse {
+    Json(HealthResponse {
         status: "healthy".to_string(),
-        service: "rust-selfhost-server".to_string(),
-        version: "0.1.0".to_string(),
         timestamp: chrono::Utc::now().to_rfc3339(),
-    };
-    
-    info!("Health check requested");
-    Ok(ResponseJson(response))
+    })
 }
 
-// Root endpoint with service info
-async fn root() -> Result<ResponseJson<InfoResponse>, StatusCode> {
-    let response = InfoResponse {
-        service: "rust-selfhost-server".to_string(),
-        version: "0.1.0".to_string(),
-        description: "A Rust Axum-based HTTP server with Docker Build Cloud CI/CD integration".to_string(),
-        endpoints: vec![
-            "/".to_string(),
-            "/healthz".to_string(),
-        ],
-    };
-    
-    info!("Root endpoint requested");
-    Ok(ResponseJson(response))
+async fn root_handler() -> Html<&'static str> {
+    Html(r#"
+    <html>
+    <head><title>Rust Self-Host Server</title></head>
+    <body style="font-family: Arial, sans-serif; margin: 2rem; background: #f5f5f5;">
+        <div style="max-width: 800px; margin: 0 auto; background: white; padding: 2rem; border-radius: 8px;">
+            <h1>🚀 Rust Self-Host Server</h1>
+            <div style="background: #d4edda; color: #155724; padding: 1rem; border-radius: 4px; margin: 1rem 0;">
+                ✅ Server is running successfully!
+            </div>
+            <h2>Available Endpoints:</h2>
+            <ul>
+                <li><strong>GET /</strong> - This welcome page</li>
+                <li><strong>GET /health</strong> - Health check endpoint</li>
+            </ul>
+            <p style="text-align: center; color: #666;">Built with ❤️ using Rust and Axum</p>
+        </div>
+    </body>
+    </html>
+    "#)
 }
 
-// 404 handler
-async fn handler_404() -> Result<ResponseJson<HashMap<String, String>>, StatusCode> {
-    let mut response = HashMap::new();
-    response.insert("error".to_string(), "Not Found".to_string());
-    response.insert("message".to_string(), "The requested resource was not found".to_string());
-    
-    Ok(ResponseJson(response))
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {
+            info!("Received Ctrl+C signal");
+        },
+        _ = terminate => {
+            info!("Received terminate signal");
+        },
+    }
 }
 
 #[tokio::main]
 async fn main() {
-    // Initialize tracing
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "rust_selfhost_server=debug,tower_http=debug".into()),
-        )
-        .with(tracing_subscriber::fmt::layer())
-        .init();
+    tracing_subscriber::init();
 
-    // Build our application with routes
     let app = Router::new()
-        .route("/", get(root))
-        .route("/healthz", get(healthz))
-        .fallback(handler_404)
-        .layer(TraceLayer::new_for_http());
+        .route("/", get(root_handler))
+        .route("/health", get(health_check))
+        .layer(CorsLayer::permissive());
 
-    // Get port from environment or default to 3000
     let port = std::env::var("PORT")
         .unwrap_or_else(|_| "3000".to_string())
         .parse::<u16>()
         .expect("PORT must be a valid number");
 
-    let addr = format!("0.0.0.0:{}", port);
-    info!("Starting server on {}", addr);
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    info!("🚀 Server starting on http://0.0.0.0:{}", port);
 
-    // Create TCP listener
-    let listener = TcpListener::bind(&addr)
+    let listener = tokio::net::TcpListener::bind(addr)
         .await
         .expect("Failed to bind to address");
 
-    info!("Server listening on http://{}", addr);
-    info!("Health check available at http://{}/healthz", addr);
+    info!("✅ Server is ready to accept connections");
 
-    // Start the server
     axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
         .await
-        .expect("Server failed to start");
+        .unwrap();
+
+    info!("🛑 Server shutdown complete");
 }
