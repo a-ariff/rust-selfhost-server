@@ -27,12 +27,45 @@ services:
       - "traefik.http.routers.traefik.tls.certresolver=letsencrypt"
       - "traefik.http.services.traefik.loadbalancer.server.port=8080"
 
+  # PostgreSQL Database Service
+  db:
+    image: postgres:16
+    container_name: postgres-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-rust_server_db}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - traefik-network
+    ports:
+      - "5432:5432"  # Expose for development (remove in production if not needed)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Main Rust Application Service
   rust-server:
     build: .
     container_name: rust-server
     restart: unless-stopped
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:password@db:5432/rust_server_db}
+      - DB_MAX_CONNECTIONS=${DB_MAX_CONNECTIONS:-10}
+      - DB_MAX_LIFETIME=${DB_MAX_LIFETIME:-3600}
+      - DB_IDLE_TIMEOUT=${DB_IDLE_TIMEOUT:-600}
+      - PORT=${PORT:-3000}
+      - RUST_LOG=${RUST_LOG:-info}
     expose:
       - "3000"
+    depends_on:
+      db:
+        condition: service_healthy
     networks:
       - traefik-network
     labels:
@@ -42,8 +75,25 @@ services:
       - "traefik.http.routers.rust-server.tls.certresolver=letsencrypt"
       - "traefik.http.services.rust-server.loadbalancer.server.port=3000"
 
+  # Example: Additional service (commented out)
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: redis-cache
+  #   restart: unless-stopped
+  #   volumes:
+  #     - redis-data:/data
+  #   networks:
+  #     - traefik-network
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+
 volumes:
   traefik-ssl:
+  postgres-data:
+  # redis-data:  # Uncomment if using Redis
 
 networks:
   traefik-network:
