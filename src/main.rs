@@ -1,49 +1,102 @@
-use axum::{
-    http::StatusCode,
-    response::{Html, IntoResponse, Json},
-    routing::get,
-    Router,
-};
-use serde::Serialize;
+use axum::{extract::State, http::StatusCode, response::Json, routing::get, Router};
+use serde_json::{json, Value};
 use std::net::SocketAddr;
 use tokio::signal;
 use tower_http::cors::CorsLayer;
-use tracing::{info, warn};
-use tracing_subscriber;
+use tracing::{error, info};
 
-#[derive(Serialize)]
-struct HealthResponse {
-    status: String,
-    timestamp: String,
+mod config;
+mod db;
+
+use config::Config;
+use db::Database;
+
+#[derive(Clone)]
+pub struct AppState {
+    pub db: Database,
 }
 
-async fn health_check() -> impl IntoResponse {
-    Json(HealthResponse {
-        status: "healthy".to_string(),
-        timestamp: chrono::Utc::now().to_rfc3339(),
-    })
+#[tokio::main]
+async fn main() {
+    // Initialize tracing
+    tracing_subscriber::fmt().init();
+
+    info!("🔧 Loading configuration...");
+    let config = match Config::from_env() {
+        Ok(config) => {
+            info!("✅ Configuration loaded successfully");
+            config
+        }
+        Err(e) => {
+            error!("❌ Failed to load configuration: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    info!("🗄️ Initializing database connection...");
+    let database = match Database::new(&config).await {
+        Ok(db) => {
+            info!("✅ Database connection established");
+            db
+        }
+        Err(e) => {
+            error!("❌ Failed to connect to database: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    // Create application state
+    let app_state = AppState { db: database };
+
+    // Build our application with routes
+    let app = Router::new()
+        .route("/", get(root_handler))
+        .route("/health", get(health_check))
+        .route("/health/db", get(db_health_check))
+        .layer(CorsLayer::permissive())
+        .with_state(app_state);
+
+    // Get port from environment or use default
+    let port = std::env::var("PORT")
+        .unwrap_or_else(|_| "3000".to_string())
+        .parse::<u16>()
+        .expect("PORT must be a valid number");
+
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    info!("🚀 Server starting on http://0.0.0.0:{}", port);
+
+    // Create listener
+    let listener = tokio::net::TcpListener::bind(addr)
+        .await
+        .expect("Failed to bind to address");
+
+    info!("✅ Server is ready to accept connections");
+
+    // Start server with graceful shutdown
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+        .unwrap();
+
+    info!("🛑 Server shutdown complete");
 }
 
-async fn root_handler() -> Html<&'static str> {
-    Html(r#"
-    <html>
-    <head><title>Rust Self-Host Server</title></head>
-    <body style="font-family: Arial, sans-serif; margin: 2rem; background: #f5f5f5;">
-        <div style="max-width: 800px; margin: 0 auto; background: white; padding: 2rem; border-radius: 8px;">
-            <h1>🚀 Rust Self-Host Server</h1>
-            <div style="background: #d4edda; color: #155724; padding: 1rem; border-radius: 4px; margin: 1rem 0;">
-                ✅ Server is running successfully!
-            </div>
-            <h2>Available Endpoints:</h2>
-            <ul>
-                <li><strong>GET /</strong> - This welcome page</li>
-                <li><strong>GET /health</strong> - Health check endpoint</li>
-            </ul>
-            <p style="text-align: center; color: #666;">Built with ❤️ using Rust and Axum</p>
-        </div>
-    </body>
-    </html>
-    "#)
+async fn root_handler() -> Json<Value> {
+    Json(json!({
+        "message": "Rust Self-Host Server",
+        "status": "running"
+    }))
+}
+
+async fn health_check() -> StatusCode {
+    StatusCode::OK
+}
+
+async fn db_health_check(State(state): State<AppState>) -> StatusCode {
+    match state.db.health_check().await {
+        Ok(_) => StatusCode::OK,
+        Err(_) => StatusCode::SERVICE_UNAVAILABLE,
+    }
 }
 
 async fn shutdown_signal() {
@@ -65,42 +118,9 @@ async fn shutdown_signal() {
     let terminate = std::future::pending::<()>();
 
     tokio::select! {
-        _ = ctrl_c => {
-            info!("Received Ctrl+C signal");
-        },
-        _ = terminate => {
-            info!("Received terminate signal");
-        },
+        _ = ctrl_c => {},
+        _ = terminate => {},
     }
-}
 
-#[tokio::main]
-async fn main() {
-    tracing_subscriber::init();
-
-    let app = Router::new()
-        .route("/", get(root_handler))
-        .route("/health", get(health_check))
-        .layer(CorsLayer::permissive());
-
-    let port = std::env::var("PORT")
-        .unwrap_or_else(|_| "3000".to_string())
-        .parse::<u16>()
-        .expect("PORT must be a valid number");
-
-    let addr = SocketAddr::from(([0, 0, 0, 0], port));
-    info!("🚀 Server starting on http://0.0.0.0:{}", port);
-
-    let listener = tokio::net::TcpListener::bind(addr)
-        .await
-        .expect("Failed to bind to address");
-
-    info!("✅ Server is ready to accept connections");
-
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
-        .await
-        .unwrap();
-
-    info!("🛑 Server shutdown complete");
+    info!("🛑 Shutdown signal received");
 }
