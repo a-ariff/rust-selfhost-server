@@ -1,11 +1,4 @@
-use axum::{
-    extract::State,
-    http::StatusCode,
-    response::Json,
-    routing::get,
-    serve,
-    Router,
-};
+use axum::{extract::State, http::StatusCode, response::Json, routing::get, serve, Router};
 use serde_json::{json, Value};
 use std::net::SocketAddr;
 use tokio::signal;
@@ -29,7 +22,6 @@ async fn main() {
     tracing_subscriber::init();
 
     info!("🔧 Loading configuration...");
-
     let config = match Config::from_env() {
         Ok(config) => {
             info!("✅ Configuration loaded successfully");
@@ -42,7 +34,6 @@ async fn main() {
     };
 
     info!("🗄️ Initializing database connection...");
-
     let database = match Database::new(&config).await {
         Ok(db) => {
             info!("✅ Database connection established");
