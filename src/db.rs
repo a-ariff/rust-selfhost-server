@@ -99,34 +99,34 @@ pub struct PoolInfo {
 mod tests {
     use super::*;
     use crate::config::Config;
-    
+
     // Note: These tests require a running PostgreSQL instance
     // They are integration tests and may be skipped in CI without DB setup
-    
+
     #[tokio::test]
     #[ignore = "requires database"]
     async fn test_database_creation() {
         std::env::set_var("DATABASE_URL", "postgres://test:test@localhost/testdb");
-        
+
         let config = Config::from_env().unwrap();
         let db = Database::new(&config).await;
-        
+
         assert!(db.is_ok());
-        
+
         std::env::remove_var("DATABASE_URL");
     }
-    
+
     #[tokio::test]
     #[ignore = "requires database"]
     async fn test_health_check() {
         std::env::set_var("DATABASE_URL", "postgres://test:test@localhost/testdb");
-        
+
         let config = Config::from_env().unwrap();
         let db = Database::new(&config).await.unwrap();
-        
+
         let health = db.health_check().await;
         assert!(health.is_ok());
-        
+
         std::env::remove_var("DATABASE_URL");
     }
 }
