@@ -83,14 +83,14 @@ mod tests {
         std::env::remove_var("DB_MAX_CONNECTIONS");
         std::env::remove_var("DB_MAX_LIFETIME");
         std::env::remove_var("DB_IDLE_TIMEOUT");
-        
+
         std::env::set_var("DATABASE_URL", "postgres://test:test@localhost/testdb");
-        
+
         let config = Config::from_env().unwrap();
         assert_eq!(config.max_connections(), 10);
         assert_eq!(config.max_lifetime(), Duration::from_secs(3600));
         assert_eq!(config.idle_timeout(), Duration::from_secs(600));
-        
+
         std::env::remove_var("DATABASE_URL");
     }
 }
