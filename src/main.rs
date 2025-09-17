@@ -1,5 +1,4 @@
 use axum::{
-    http::StatusCode,
     response::{Html, IntoResponse, Json},
     routing::get,
     Router,
@@ -8,8 +7,8 @@ use serde::Serialize;
 use std::net::SocketAddr;
 use tokio::signal;
 use tower_http::cors::CorsLayer;
-use tracing::{info, warn};
-use tracing_subscriber;
+use tracing::info;
+use tracing_subscriber::EnvFilter;
 
 #[derive(Serialize)]
 struct HealthResponse {
@@ -25,7 +24,8 @@ async fn health_check() -> impl IntoResponse {
 }
 
 async fn root_handler() -> Html<&'static str> {
-    Html(r#"
+    Html(
+        r#"
     <html>
     <head><title>Rust Self-Host Server</title></head>
     <body style="font-family: Arial, sans-serif; margin: 2rem; background: #f5f5f5;">
@@ -43,7 +43,8 @@ async fn root_handler() -> Html<&'static str> {
         </div>
     </body>
     </html>
-    "#)
+    "#,
+    )
 }
 
 async fn shutdown_signal() {
@@ -76,7 +77,9 @@ async fn shutdown_signal() {
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::init();
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .init();
 
     let app = Router::new()
         .route("/", get(root_handler))
