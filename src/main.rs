@@ -1,9 +1,9 @@
-use axum::{extract::State, http::StatusCode, response::Json, routing::get, serve, Router};
+use axum::{extract::State, http::StatusCode, response::Json, routing::get, Router};
 use serde_json::{json, Value};
 use std::net::SocketAddr;
 use tokio::signal;
 use tower_http::cors::CorsLayer;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 mod config;
 mod db;
@@ -19,7 +19,7 @@ pub struct AppState {
 #[tokio::main]
 async fn main() {
     // Initialize tracing
-    tracing_subscriber::init();
+    tracing_subscriber::fmt().init();
 
     info!("🔧 Loading configuration...");
     let config = match Config::from_env() {
