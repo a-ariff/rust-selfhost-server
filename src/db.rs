@@ -48,7 +48,8 @@ impl Database {
     /// Attempts to acquire a connection from the pool and execute a simple query
     /// to verify the database is accessible and responsive.
     pub async fn health_check(&self) -> Result<()> {
-        let mut conn = self.pool
+        let mut conn = self
+            .pool
             .acquire()
             .await
             .map_err(|e| anyhow::anyhow!("Failed to acquire database connection: {}", e))?;
