@@ -4,10 +4,8 @@ use std::net::SocketAddr;
 use tokio::signal;
 use tower_http::cors::CorsLayer;
 use tracing::{error, info};
-
 mod config;
 mod db;
-
 use config::Config;
 use db::Database;
 
@@ -20,7 +18,6 @@ pub struct AppState {
 async fn main() {
     // Initialize tracing
     tracing_subscriber::fmt().init();
-
     info!("🔧 Loading configuration...");
     let config = match Config::from_env() {
         Ok(config) => {
@@ -32,7 +29,6 @@ async fn main() {
             std::process::exit(1);
         }
     };
-
     info!("🗄️ Initializing database connection...");
     let database = match Database::new(&config).await {
         Ok(db) => {
@@ -44,10 +40,8 @@ async fn main() {
             std::process::exit(1);
         }
     };
-
     // Create application state
     let app_state = AppState { db: database };
-
     // Build our application with routes
     let app = Router::new()
         .route("/", get(root_handler))
@@ -55,29 +49,23 @@ async fn main() {
         .route("/health/db", get(db_health_check))
         .layer(CorsLayer::permissive())
         .with_state(app_state);
-
     // Get port from environment or use default
     let port = std::env::var("PORT")
         .unwrap_or_else(|_| "3000".to_string())
         .parse::<u16>()
         .expect("PORT must be a valid number");
-
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     info!("🚀 Server starting on http://0.0.0.0:{}", port);
-
     // Create listener
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .expect("Failed to bind to address");
-
     info!("✅ Server is ready to accept connections");
-
     // Start server with graceful shutdown
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await
         .unwrap();
-
     info!("🛑 Server shutdown complete");
 }
 
@@ -105,7 +93,6 @@ async fn shutdown_signal() {
             .await
             .expect("failed to install Ctrl+C handler");
     };
-
     #[cfg(unix)]
     let terminate = async {
         signal::unix::signal(signal::unix::SignalKind::terminate())
@@ -113,14 +100,11 @@ async fn shutdown_signal() {
             .recv()
             .await;
     };
-
     #[cfg(not(unix))]
     let terminate = std::future::pending::<()>();
-
     tokio::select! {
         _ = ctrl_c => {},
         _ = terminate => {},
     }
-
     info!("🛑 Shutdown signal received");
 }
