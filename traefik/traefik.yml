@@ -27,7 +27,7 @@ providers:
 certificatesResolvers:
   letsencrypt:
     acme:
-      email: "ariff.mit@gmail.com"
+      # Email will be set via TRAEFIK_ACME_EMAIL environment variable
       storage: /ssl/acme.json
       httpChallenge:
         entryPoint: web

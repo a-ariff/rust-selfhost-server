@@ -9,8 +9,6 @@ services:
       - "80:80"
       - "443:443"
       - "8080:8080"  # Traefik dashboard (optional, remove in production)
-    environment:
-      - TRAEFIK_ACME_EMAIL=${TRAEFIK_ACME_EMAIL:-ariff.mit@gmail.com}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traefik/traefik.yml:/traefik.yml:ro
@@ -18,6 +16,7 @@ services:
       - traefik-ssl:/ssl
     command:
       - --configFile=/traefik.yml
+      - --certificatesresolvers.letsencrypt.acme.email=${TRAEFIK_ACME_EMAIL}
     networks:
       - traefik-network
     labels:
