@@ -300,6 +300,63 @@ cargo clippy
 cargo audit
 ```
 
+## 🔒 Security Best Practices
+
+### Environment Variables & Secrets Management
+
+**🚨 CRITICAL:** Never commit sensitive information to version control:
+
+- Use `.env` files for local development (already gitignored)
+- Use GitHub Secrets for CI/CD variables
+- Use environment variables for production configuration
+
+### Required Environment Variables
+
+Before deployment, ensure these are properly configured:
+
+```bash
+# Required - Your domain name
+DOMAIN=your-domain.com
+
+# Required - Email for Let's Encrypt SSL certificates
+TRAEFIK_ACME_EMAIL=your-email@domain.com
+
+# Required - Strong database credentials for production
+DATABASE_URL=postgresql://secure_user:strong_password@db:5432/production_db
+POSTGRES_USER=secure_user
+POSTGRES_PASSWORD=generate_strong_password_here
+```
+
+### Production Security Checklist
+
+- [ ] Strong, unique database passwords
+- [ ] Valid email address for SSL certificates
+- [ ] Secure server access (SSH keys, not passwords)
+- [ ] Regular security updates (`cargo audit`)
+- [ ] Monitor application logs
+- [ ] Backup database regularly
+- [ ] Use HTTPS only (handled by Traefik)
+- [ ] Rate limiting configured (handled by Traefik)
+
+### GitHub Actions Security
+
+Set these secrets in your repository settings:
+
+- `DEPLOY_SSH_KEY`: Private SSH key for server access
+- `DEPLOY_HOST`: Server IP address
+- `DEPLOY_USER`: Server username
+- `DOCKER_PAT`: Docker Hub Personal Access Token (for Docker builds)
+
+### Files to Never Commit
+
+The `.gitignore` file prevents committing sensitive files:
+
+- `.env*` files containing secrets
+- SSL certificates and private keys (`*.pem`, `*.key`)
+- Database files
+- SSH keys
+- Personal configuration files
+
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
