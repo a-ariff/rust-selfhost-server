@@ -41,7 +41,9 @@ async fn main() {
         }
     };
     // Create application state
-    let app_state = AppState { db: database };
+    let app_state = AppState {
+        db: database.clone(),
+    };
     // Build our application with routes
     let app = Router::new()
         .route("/", get(root_handler))
@@ -63,7 +65,7 @@ async fn main() {
     info!("✅ Server is ready to accept connections");
     // Start server with graceful shutdown
     axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
+        .with_graceful_shutdown(shutdown_signal(database))
         .await
         .unwrap();
     info!("🛑 Server shutdown complete");
@@ -87,7 +89,7 @@ async fn db_health_check(State(state): State<AppState>) -> StatusCode {
     }
 }
 
-async fn shutdown_signal() {
+async fn shutdown_signal(db: Database) {
     let ctrl_c = async {
         signal::ctrl_c()
             .await
@@ -107,4 +109,6 @@ async fn shutdown_signal() {
         _ = terminate => {},
     }
     info!("🛑 Shutdown signal received");
+    db.close().await;
+    info!("✅ Pending processes have been cancelled");
 }
