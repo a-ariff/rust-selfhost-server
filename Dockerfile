@@ -12,13 +12,12 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy manifests first for better layer caching
-COPY Cargo.toml ./
+COPY Cargo.toml Cargo.lock ./
 
-# Create a dummy src directory and main.rs for dependency building
-RUN mkdir src && echo 'fn main() {}' > src/main.rs
-
-# Build dependencies only (this layer will be cached unless Cargo.toml changes)
-RUN cargo build --release && rm src/main.rs
+# Fetch dependencies without compiling the application code. This keeps
+# dependency downloads cached while avoiding build failures caused by the dummy
+# `main.rs` approach when new source files are required during compilation.
+RUN cargo fetch --locked
 
 # Copy source code
 COPY src ./src
